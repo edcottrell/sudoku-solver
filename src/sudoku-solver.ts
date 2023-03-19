@@ -97,10 +97,16 @@ function checkCell(puzzle : SudokuPuzzle, cellNumber : number) {
 }
 
 function checkCellAgainstArrayOfCells(puzzle : SudokuPuzzle, cell : SudokuCell, comparisonCells : SudokuCell[], reasonForActions : SudokuActionReason) {
+    if (cell.hasOwnProperty('value')) {
+        // it already has a value, so skip further checks
+        return;
+    }
     for (const comparisonCell of comparisonCells) {
         checkCellAgainstCell(puzzle, cell, comparisonCell, reasonForActions);
         if (cell.candidates.length === 1) {
-            fillCellWithValue(puzzle, cell, cell.candidates[0], SudokuActionReason.ONLY_CANDIDATE);
+            if (!cell.hasOwnProperty('value')) {
+                fillCellWithValue(puzzle, cell, cell.candidates[0], SudokuActionReason.ONLY_CANDIDATE);
+            }
             break;
         }
     }
@@ -263,6 +269,14 @@ function getUnfilledCells(puzzle : SudokuPuzzle) : SudokuCell[] {
     return puzzle.cells.filter(c => !c.hasOwnProperty('value'));
 }
 
+function getUnfilledNeighborsOfCell(puzzle : SudokuPuzzle, cell : SudokuCell) : SudokuCell[] {
+    return puzzle.cells.filter((neighbor : SudokuCell) : boolean => {
+       return cell.index !== neighbor.index
+           && !neighbor.hasOwnProperty('value')
+           && ((cell.box === neighbor.box) || (cell.column === neighbor.column) || (cell.row === neighbor.row));
+    });
+}
+
 function fillCellWithValue(puzzle : SudokuPuzzle, cell : SudokuCell, value : number, reasonForActions : SudokuActionReason) {
     if (cell.hasOwnProperty('value')) {
         throw (new Error(`ERROR at step ${puzzle.checkCounter}: Asked to fill in cell ${cell.index} (row ${cell.row + 1}, column ${cell.column + 1}) with value ${value}, but it already has a value (${cell.value})...`))
@@ -285,6 +299,16 @@ function fillCellWithValue(puzzle : SudokuPuzzle, cell : SudokuCell, value : num
         case SudokuActionReason.ROW_CHECK: reasonText = "no other cell in this row could have this value"; break;
         default: reasonText = "NO EXPLANATION GIVEN. 'TIS A MYSTERY";
     }
+
+    // Update all "neighbors" of this cell that aren't filled in yet
+    const unfilledNeighbors : SudokuCell[] = getUnfilledNeighborsOfCell(puzzle, cell);
+    for (const neighbor of unfilledNeighbors) {
+        const neighborReason : SudokuActionReason = (cell.box === neighbor.box)
+            ? SudokuActionReason.BOX_CHECK
+            : (cell.column === neighbor.column ? SudokuActionReason.COLUMN_CHECK : SudokuActionReason.ROW_CHECK);
+        removeCandidateFromCell(puzzle, neighbor, cell.value, neighborReason);
+    }
+
     console.log(`Step ${puzzle.checkCounter}: Filled in cell ${cell.index} (row ${cell.row + 1}, column ${cell.column + 1}) with value ${value} because ${reasonText}...`);
     outputPuzzle(puzzle);
 }
@@ -455,6 +479,9 @@ function removeCandidateFromCell(puzzle : SudokuPuzzle, cell: SudokuCell, candid
         actionReason : reasonForActions,
     };
     logAction(puzzle, action);
+    if (cell.candidates.length === 1) {
+        fillCellWithValue(puzzle, cell, cell.candidates[0], SudokuActionReason.ONLY_CANDIDATE);
+    }
 }
 
 function showReasonForQuitting(puzzle : SudokuPuzzle) {
