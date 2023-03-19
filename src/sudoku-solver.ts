@@ -338,7 +338,7 @@ function fillCellWithValue(puzzle : SudokuPuzzle, cell : SudokuCell, value : num
     }
 
     console.log(`Step ${puzzle.checkCounter}: Filled in cell ${cell.index} (row ${cell.row + 1}, column ${cell.column + 1}) with value ${value} because ${reasonText}...`);
-    outputPuzzle(puzzle);
+    outputPuzzle(puzzle, cell.index);
 }
 
 function initializeCandidates(puzzle : SudokuPuzzle) {
@@ -483,8 +483,10 @@ function okayToKeepTrying(puzzle : SudokuPuzzle) : boolean {
     return true;
 }
 
-function outputPuzzle(puzzle : SudokuPuzzle) {
-    console.warn('PRETTY PUZZLE OUTPUT IS NOT YET IMPLEMENTED');
+function outputPuzzle(puzzle : SudokuPuzzle, cellIndexToHighlight? : number) {
+    if (!cellIndexToHighlight) {
+        cellIndexToHighlight = -1;
+    }
     for (let row = 0; row < 9; row++) {
         let rowOutput = '';
         if (row % 3 === 0) {
@@ -496,7 +498,9 @@ function outputPuzzle(puzzle : SudokuPuzzle) {
                 rowOutput += '| ';
             }
             if (cell.hasOwnProperty('value')) {
-                rowOutput += `${cell.given ? FORMAT.FgCyan : FORMAT.FgGreen}${cell.value}${FORMAT.Reset} `;
+                rowOutput += (cell.given ? FORMAT.FgCyan : FORMAT.FgGreen)
+                    + (cell.index === cellIndexToHighlight ? FORMAT.Reverse : '')
+                    + `${cell.value}${FORMAT.Reset} `;
             } else {
                 rowOutput += '  ';
             }
