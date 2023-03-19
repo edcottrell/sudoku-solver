@@ -1,0 +1,7 @@
+.idea/
+coverage
+dist
+config.json
+node_modules/
+test-build/
+types/

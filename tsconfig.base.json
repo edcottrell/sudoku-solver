@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "lib": ["es2022","dom"],
+    "module": "ES2022",
+    "target": "ES2022",
+    "preserveConstEnums": true,
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "sourceMap": true,
+    "types": ["node", "jest"],
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths" : {
+      "*": ["*", "src/*", "dist/*", "types/dist/*", "test/*", "test-build/test/*"],
+      "@test/*": ["test/*", "test-build/test/*", "*"]
+    },
+    "allowJs": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
