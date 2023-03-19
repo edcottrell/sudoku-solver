@@ -511,9 +511,12 @@ function outputPuzzle(puzzle : SudokuPuzzle, cellIndexToHighlight? : number) {
     console.log("+-------+-------+-------+");
 }
 
-function outputPuzzleAsStringOfNumbers(puzzle : SudokuPuzzle) : string {
+function outputPuzzleAsStringOfNumbers(puzzle : SudokuPuzzle, lineBreaks : boolean = false) : string {
     let output = '';
     for (const cell of puzzle.cells) {
+        if (lineBreaks && cell.index > 0 && cell.row !== puzzle.cells[cell.index - 1].row) {
+            output += "\n";
+        }
         output += cell.hasOwnProperty('value') ? cell.value : '0';
     }
     return output;
@@ -657,4 +660,5 @@ console.log(puzzle.cells[0],
 process.exit(-1);
 */
 solvePuzzle(puzzle);
-console.log(`The string representation of this puzzle's solution is \n${outputPuzzleAsStringOfNumbers(puzzle)}`);
+console.log(`The string representation of this puzzle's solution is \n${outputPuzzleAsStringOfNumbers(puzzle)}\n`);
+console.log(`The multi-line string representation of this puzzle's solution is \n${outputPuzzleAsStringOfNumbers(puzzle, true)}`);
