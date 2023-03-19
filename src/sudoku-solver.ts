@@ -133,6 +133,7 @@ function checkCellAgainstArrayOfCells(puzzle : SudokuPuzzle, cell : SudokuCell, 
         checkCellAgainstCell(puzzle, cell, comparisonCell, reasonForActions);
         if (cell.candidates.length === 1) {
             if (!cell.hasOwnProperty('value')) {
+                puzzle.checkCounter++;
                 fillCellWithValue(puzzle, cell, cell.candidates[0], SudokuActionReason.ONLY_CANDIDATE);
             }
             break;
