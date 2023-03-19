@@ -438,7 +438,6 @@ function initializePuzzleFromArray(values : number[][]) : SudokuPuzzle {
             }
         }
     }
-    initializeCandidates(puzzle);
     return puzzle;
 }
 
@@ -581,6 +580,7 @@ function solvePuzzle(puzzle : SudokuPuzzle, maxChecks : number = 10000, maxCheck
         puzzle.solveParameters.maxChecksWithoutAction = maxChecksWithoutAction;
     }
     console.log('Starting solve...');
+    initializeCandidates(puzzle);
     while (okayToKeepTrying(puzzle)) {
         const unfilledCells : SudokuCell[] = getUnfilledCells(puzzle);
         for (const cell of unfilledCells) {
