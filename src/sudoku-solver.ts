@@ -77,15 +77,6 @@ export type SudokuPuzzle = {
 function checkCell(puzzle : SudokuPuzzle, cellNumber : number) {
     const cell = puzzle.cells[cellNumber];
     if (okayToKeepTrying(puzzle) && !cell.hasOwnProperty('value')) {
-        checkCellAgainstRow(puzzle, cell);
-    }
-    if (okayToKeepTrying(puzzle) && !cell.hasOwnProperty('value')) {
-        checkCellAgainstColumn(puzzle, cell);
-    }
-    if (okayToKeepTrying(puzzle) && !cell.hasOwnProperty('value')) {
-        checkCellAgainstBox(puzzle, cell);
-    }
-    if (okayToKeepTrying(puzzle) && !cell.hasOwnProperty('value')) {
         checkWhetherCellIsOnlyPossibilityInRowForAnyNumber(puzzle, cell);
     }
     if (okayToKeepTrying(puzzle) && !cell.hasOwnProperty('value')) {
@@ -94,11 +85,20 @@ function checkCell(puzzle : SudokuPuzzle, cellNumber : number) {
     if (okayToKeepTrying(puzzle) && !cell.hasOwnProperty('value')) {
         checkWhetherCellIsOnlyPossibilityInBoxForAnyNumber(puzzle, cell);
     }
+    if (okayToKeepTrying(puzzle) && !cell.hasOwnProperty('value')) {
+        checkCellAgainstRow(puzzle, cell);
+    }
+    if (okayToKeepTrying(puzzle) && !cell.hasOwnProperty('value')) {
+        checkCellAgainstColumn(puzzle, cell);
+    }
+    if (okayToKeepTrying(puzzle) && !cell.hasOwnProperty('value')) {
+        checkCellAgainstBox(puzzle, cell);
+    }
 }
 
-function checkCellAgainstArrayOfCells(puzzle : SudokuPuzzle, cell : SudokuCell, comparisonCells : SudokuCell[]) {
+function checkCellAgainstArrayOfCells(puzzle : SudokuPuzzle, cell : SudokuCell, comparisonCells : SudokuCell[], reasonForActions : SudokuActionReason) {
     for (const comparisonCell of comparisonCells) {
-        checkCellAgainstCell(puzzle, cell, comparisonCell, SudokuActionReason.BOX_CHECK);
+        checkCellAgainstCell(puzzle, cell, comparisonCell, reasonForActions);
         if (cell.candidates.length === 1) {
             fillCellWithValue(puzzle, cell, cell.candidates[0], SudokuActionReason.ONLY_CANDIDATE);
             break;
@@ -112,7 +112,7 @@ function checkCellAgainstBox(puzzle : SudokuPuzzle, cell : SudokuCell) {
         return;
     }
     const filledCellsInBox = getCellsInBox(puzzle, cell.box, SudokuFilterCondition.FILLED_CELLS, cell.index);
-    checkCellAgainstArrayOfCells(puzzle, cell, filledCellsInBox);
+    checkCellAgainstArrayOfCells(puzzle, cell, filledCellsInBox, SudokuActionReason.BOX_CHECK);
 }
 
 function checkCellAgainstCell(puzzle : SudokuPuzzle, cell : SudokuCell, comparisonCell : SudokuCell, reasonForActions : SudokuActionReason) {
@@ -140,7 +140,7 @@ function checkCellAgainstColumn(puzzle : SudokuPuzzle, cell : SudokuCell) {
         return;
     }
     const filledCellsInColumn = getCellsInColumn(puzzle, cell.column, SudokuFilterCondition.FILLED_CELLS, cell.index);
-    checkCellAgainstArrayOfCells(puzzle, cell, filledCellsInColumn);
+    checkCellAgainstArrayOfCells(puzzle, cell, filledCellsInColumn, SudokuActionReason.COLUMN_CHECK);
 }
 
 function checkCellAgainstRow(puzzle : SudokuPuzzle, cell : SudokuCell) {
@@ -149,7 +149,7 @@ function checkCellAgainstRow(puzzle : SudokuPuzzle, cell : SudokuCell) {
         return;
     }
     const filledCellsInRow = getCellsInRow(puzzle, cell.row, SudokuFilterCondition.FILLED_CELLS, cell.index);
-    checkCellAgainstArrayOfCells(puzzle, cell, filledCellsInRow);
+    checkCellAgainstArrayOfCells(puzzle, cell, filledCellsInRow, SudokuActionReason.ROW_CHECK);
 }
 
 function checkWhetherCellIsOnlyPossibilityInAreaForAnyNumber(puzzle : SudokuPuzzle, cellsToCheckAgainst : SudokuCell[], cell : SudokuCell, reasonForActions : SudokuActionReason) {
@@ -160,9 +160,9 @@ function checkWhetherCellIsOnlyPossibilityInAreaForAnyNumber(puzzle : SudokuPuzz
 
     for (let candidateIndex = 0; candidateIndex < cell.candidates.length; candidateIndex++) {
         const candidate = cell.candidates[candidateIndex];
-        let cellToCheckIndex = 0;
         let possibilityFound = false;
-        for (const comparisonCell of cellsToCheckAgainst) {
+        for (let cellToCheckIndex = 0; cellToCheckIndex < cellsToCheckAgainst.length; cellToCheckIndex++) {
+            const comparisonCell = cellsToCheckAgainst[cellToCheckIndex];
             if (cell.index === comparisonCell.index) {
                 continue;
             }
@@ -174,10 +174,10 @@ function checkWhetherCellIsOnlyPossibilityInAreaForAnyNumber(puzzle : SudokuPuzz
             if (!okayToKeepTrying(puzzle)) {
                 break;
             }
-            cellToCheckIndex++;
         }
         if (!possibilityFound) {
             fillCellWithValue(puzzle, cell, candidate, reasonForActions);
+            break;
         }
         if (!okayToKeepTrying(puzzle)) {
             break;
@@ -293,8 +293,15 @@ function initializeCandidates(puzzle : SudokuPuzzle) {
     const unfilledCells : SudokuCell[] = getUnfilledCells(puzzle);
     for (let cellIndex = 0; cellIndex < unfilledCells.length; cellIndex++) {
         const cell : SudokuCell = unfilledCells[cellIndex];
-        if (!cell.hasOwnProperty('value')) {
+        if (cell.hasOwnProperty('value') && typeof cell.value === 'number') {
+            cell.candidates = [cell.value];
+        } else {
+            // Start with all possibilities
             cell.candidates = [1,2,3,4,5,6,7,8,9];
+            // Then remove candidates based on the context
+            checkCellAgainstBox(puzzle, cell);
+            checkCellAgainstColumn(puzzle, cell);
+            checkCellAgainstRow(puzzle, cell);
         }
     }
 }
