@@ -74,6 +74,34 @@ export type SudokuPuzzle = {
     },
 };
 
+export const FORMAT = {
+    Reset : "",
+    Bright : "",
+    Dim : "",
+    Underscore : "",
+    Blink : "",
+    Reverse : "",
+    Hidden : "",
+    FgBlack : "",
+    FgRed : "",
+    FgGreen : "",
+    FgYellow : "",
+    FgBlue : "",
+    FgMagenta : "",
+    FgCyan : "",
+    FgWhite : "",
+    FgGray : "",
+    BgBlack : "",
+    BgRed : "",
+    BgGreen : "",
+    BgYellow : "",
+    BgBlue : "",
+    BgMagenta : "",
+    BgCyan : "",
+    BgWhite : "",
+    BgGray : "",
+};
+
 function checkCell(puzzle : SudokuPuzzle, cellNumber : number) {
     const cell = puzzle.cells[cellNumber];
     if (okayToKeepTrying(puzzle) && !cell.hasOwnProperty('value')) {
@@ -330,6 +358,36 @@ function initializeCandidates(puzzle : SudokuPuzzle) {
     }
 }
 
+function initializeColors(color : boolean = true) {
+    FORMAT.Reset = color ? "\x1b[0m" : '';
+    FORMAT.Bright = color ? "\x1b[1m" : '';
+    FORMAT.Dim = color ? "\x1b[2m" : '';
+    FORMAT.Underscore = color ? "\x1b[4m" : '';
+    FORMAT.Blink = color ? "\x1b[5m" : '';
+    FORMAT.Reverse = color ? "\x1b[7m" : '';
+    FORMAT.Hidden = color ? "\x1b[8m" : '';
+
+    FORMAT.FgBlack = color ? "\x1b[30m" : '';
+    FORMAT.FgRed = color ? "\x1b[31m" : '';
+    FORMAT.FgGreen = color ? "\x1b[32m" : '';
+    FORMAT.FgYellow = color ? "\x1b[33m" : '';
+    FORMAT.FgBlue = color ? "\x1b[34m" : '';
+    FORMAT.FgMagenta = color ? "\x1b[35m" : '';
+    FORMAT.FgCyan = color ? "\x1b[36m" : '';
+    FORMAT.FgWhite = color ? "\x1b[37m" : '';
+    FORMAT.FgGray = color ? "\x1b[90m" : '';
+
+    FORMAT.BgBlack = color ? "\x1b[40m" : '';
+    FORMAT.BgRed = color ? "\x1b[41m" : '';
+    FORMAT.BgGreen = color ? "\x1b[42m" : '';
+    FORMAT.BgYellow = color ? "\x1b[43m" : '';
+    FORMAT.BgBlue = color ? "\x1b[44m" : '';
+    FORMAT.BgMagenta = color ? "\x1b[45m" : '';
+    FORMAT.BgCyan = color ? "\x1b[46m" : '';
+    FORMAT.BgWhite = color ? "\x1b[47m" : '';
+    FORMAT.BgGray = color ? "\x1b[100m" : '';
+}
+
 function initializeEmpty9x9SudokuPuzzle() {
     const newPuzzle : SudokuPuzzle = {
         rowsCompleted : [],
@@ -434,11 +492,12 @@ function outputPuzzle(puzzle : SudokuPuzzle) {
             rowOutput += "+-------+-------+-------+\n";
         }
         for (let column = 0; column < 9; column++) {
+            const cell : SudokuCell = puzzle.cells[row * 9 + column];
             if (column % 3 === 0) {
                 rowOutput += '| ';
             }
-            if (puzzle.cells[row * 9 + column].hasOwnProperty('value')) {
-                rowOutput += puzzle.cells[row * 9 + column].value + ' ';
+            if (cell.hasOwnProperty('value')) {
+                rowOutput += `${cell.given ? FORMAT.FgCyan : FORMAT.FgGreen}${cell.value}${FORMAT.Reset} `;
             } else {
                 rowOutput += '  ';
             }
@@ -559,6 +618,7 @@ function verifySolution(puzzle : SudokuPuzzle) {
 }
 
 
+initializeColors(true);
 let puzzleValues = [
     [5,3,0,0,7,0,0,0,0],
     [6,0,0,1,9,5,0,0,0],
