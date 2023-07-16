@@ -64,7 +64,6 @@ export type SudokuPuzzle = {
     columnsCompleted : boolean[],
     cells: SudokuCell[],
     boxes: number[][],
-    boxesCompleted : boolean[],
     actions : SudokuAction[],
     checkCounter : number,
     lastCheckWithAction : number | null,
@@ -129,7 +128,8 @@ function checkCellAgainstArrayOfCells(puzzle : SudokuPuzzle, cell : SudokuCell, 
         // it already has a value, so skip further checks
         return;
     }
-    for (const comparisonCell of comparisonCells) {
+    for (let i = 0; i < comparisonCells.length; i++) {
+        const comparisonCell = comparisonCells[i];
         checkCellAgainstCell(puzzle, cell, comparisonCell, reasonForActions);
         if (cell.candidates.length === 1) {
             if (!cell.hasOwnProperty('value')) {
@@ -159,8 +159,12 @@ function checkCellAgainstCell(puzzle : SudokuPuzzle, cell : SudokuCell, comparis
         // this cell is already filled in; skip it
         return;
     }
+    if (!comparisonCell.hasOwnProperty('value')) {
+        // the comparison cell isn't filled in; skip it
+        return;
+    }
     puzzle.checkCounter++;
-    const comparisonValue = comparisonCell.hasOwnProperty('value') ? comparisonCell.value : null;
+    const comparisonValue = comparisonCell.value;
     if (comparisonValue) {
         const comparisonValueIndex = cell.candidates.indexOf(comparisonValue);
         if (comparisonValueIndex >= 0) {
@@ -196,6 +200,7 @@ function checkWhetherCellIsOnlyPossibilityInAreaForAnyNumber(puzzle : SudokuPuzz
     for (let candidateIndex = 0; candidateIndex < cell.candidates.length; candidateIndex++) {
         const candidate = cell.candidates[candidateIndex];
         let possibilityFound = false;
+        let forcedStop = false;
         for (let cellToCheckIndex = 0; cellToCheckIndex < cellsToCheckAgainst.length; cellToCheckIndex++) {
             const comparisonCell = cellsToCheckAgainst[cellToCheckIndex];
             if (cell.index === comparisonCell.index) {
@@ -207,10 +212,11 @@ function checkWhetherCellIsOnlyPossibilityInAreaForAnyNumber(puzzle : SudokuPuzz
                 break;
             }
             if (!okayToKeepTrying(puzzle)) {
+                forcedStop = true;
                 break;
             }
         }
-        if (!possibilityFound) {
+        if (!possibilityFound && !forcedStop) {
             fillCellWithValue(puzzle, cell, candidate, reasonForActions);
             break;
         }
@@ -329,23 +335,32 @@ function fillCellWithValue(puzzle : SudokuPuzzle, cell : SudokuCell, value : num
         default: reasonText = "NO EXPLANATION GIVEN. 'TIS A MYSTERY";
     }
 
+    console.log(`Step ${puzzle.checkCounter}: Filled in cell ${cell.index} (row ${cell.row + 1}, column ${cell.column + 1}) with value ${value} because ${reasonText}...`);
+    outputPuzzle(puzzle, cell.index);
+
+    if (
+        puzzle.cells.filter(c => { return c.hasOwnProperty('value') && c.value === cell.value && c.box === cell.box; }).length > 1
+        || puzzle.cells.filter(c => { return c.hasOwnProperty('value') && c.value === cell.value && c.column === cell.column; }).length > 1
+        || puzzle.cells.filter(c => { return c.hasOwnProperty('value') && c.value === cell.value && c.row === cell.row; }).length > 1
+    ) {
+        console.error(cell);
+        throw new Error('Filled in a conflict!');
+    }
+
     // Update all "neighbors" of this cell that aren't filled in yet
     const unfilledNeighbors : SudokuCell[] = getUnfilledNeighborsOfCell(puzzle, cell);
-    for (const neighbor of unfilledNeighbors) {
+    for (let neighborIndex = 0; neighborIndex < unfilledNeighbors.length; neighborIndex++) {
+        const neighbor : SudokuCell = unfilledNeighbors[neighborIndex];
         const neighborReason : SudokuActionReason = (cell.box === neighbor.box)
             ? SudokuActionReason.BOX_CHECK
             : (cell.column === neighbor.column ? SudokuActionReason.COLUMN_CHECK : SudokuActionReason.ROW_CHECK);
         removeCandidateFromCell(puzzle, neighbor, cell.value, neighborReason);
     }
-
-    console.log(`Step ${puzzle.checkCounter}: Filled in cell ${cell.index} (row ${cell.row + 1}, column ${cell.column + 1}) with value ${value} because ${reasonText}...`);
-    outputPuzzle(puzzle, cell.index);
 }
 
 function initializeCandidates(puzzle : SudokuPuzzle) {
-    const unfilledCells : SudokuCell[] = getUnfilledCells(puzzle);
-    for (let cellIndex = 0; cellIndex < unfilledCells.length; cellIndex++) {
-        const cell : SudokuCell = unfilledCells[cellIndex];
+    for (let cellIndex = 0; cellIndex < puzzle.cells.length; cellIndex++) {
+        const cell : SudokuCell = puzzle.cells[cellIndex];
         if (cell.hasOwnProperty('value') && typeof cell.value === 'number') {
             cell.candidates = [cell.value];
         } else {
@@ -395,19 +410,17 @@ function initializeEmpty9x9SudokuPuzzle() {
         columnsCompleted : [],
         cells : [],
         boxes : [[],[],[],[],[],[],[],[],[]],
-        boxesCompleted : [],
         actions : [],
         checkCounter : 0,
         lastCheckWithAction : null,
         solveParameters : {
-            maxChecks : 10000,
+            maxChecks : 100000,
             maxChecksWithoutAction : 500,
         },
     };
     for (let row = 0; row < 9; row++) {
         newPuzzle.rowsCompleted[row] = false;
         newPuzzle.columnsCompleted[row] = false;
-        newPuzzle.boxesCompleted[row] = false;
         for (let column = 0; column < 9; column++) {
             const cellIndex : number = row * 9 + column;
             const boxRow : number = (row < 3) ? 0 : ((row < 6) ? 1 : 2);
@@ -435,6 +448,7 @@ function initializePuzzleFromArray(values : number[][]) : SudokuPuzzle {
             const cellIndex = row * 9 + column;
             if (values[row][column] !== 0) {
                 puzzle.cells[cellIndex].value = values[row][column];
+                puzzle.cells[cellIndex].candidates = [values[row][column]];
                 puzzle.cells[cellIndex].given = true;
             }
         }
@@ -540,12 +554,23 @@ function puzzleIsSolved(puzzle : SudokuPuzzle) : boolean {
 }
 
 function removeCandidateFromCell(puzzle : SudokuPuzzle, cell: SudokuCell, candidate : number, reasonForActions : SudokuActionReason) {
+    if (cell.hasOwnProperty('value')) {
+        // nothing to update
+        return;
+    }
     const candidateIndex = cell.candidates.indexOf(candidate);
     if (candidateIndex === -1) {
         // This wasn't a candidate, anyway, so move on
         return;
     }
+    puzzle.checkCounter++;
+    // Over-the-top detail logging
+    // console.log(`Step ${puzzle.checkCounter}: Cell ${cell.index} (row ${cell.row + 1}, column ${cell.column + 1}):\n`
+    //     + `  Candidates: ${cell.candidates.join(', ')}\n`
+    //     + `  Removing ${candidate} at index ${candidateIndex}`);
     cell.candidates.splice(candidateIndex, 1);
+    // More over-the-top detail logging
+    // console.log(`  New candidates: ${cell.candidates.join(', ')}`);
     const action : SudokuAction = {
         actionType : SudokuActionType.REMOVE_CANDIDATES,
         cells : [cell.index],
@@ -566,10 +591,10 @@ function showReasonForQuitting(puzzle : SudokuPuzzle) {
             console.error(err);
             process.exit(-1);
         }
-        console.log(`Solved the puzzle in ${puzzle.checkCounter.toLocaleString()} steps!`);
+        console.log(`${FORMAT.FgGreen}Solved the puzzle in ${puzzle.checkCounter.toLocaleString()} steps!${FORMAT.Reset}`);
         outputPuzzle(puzzle);
     } else {
-        console.error(`Failed to solve the puzzle after ${puzzle.checkCounter.toLocaleString()} steps!`);
+        console.error(`${FORMAT.FgRed}Failed to solve the puzzle after ${puzzle.checkCounter.toLocaleString()} steps!${FORMAT.Reset}`);
         const lastAction = puzzle.actions[puzzle.actions.length - 1];
         let lastActionReasonText;
         switch (lastAction.actionReason) {
@@ -588,7 +613,7 @@ function showReasonForQuitting(puzzle : SudokuPuzzle) {
     }
 }
 
-function solvePuzzle(puzzle : SudokuPuzzle, maxChecks : number = 10000, maxChecksWithoutAction = 500) {
+function solvePuzzle(puzzle : SudokuPuzzle, maxChecks : number = 100000, maxChecksWithoutAction = 500) {
     if (maxChecks) {
         puzzle.solveParameters.maxChecks = maxChecks;
     }
@@ -599,7 +624,8 @@ function solvePuzzle(puzzle : SudokuPuzzle, maxChecks : number = 10000, maxCheck
     initializeCandidates(puzzle);
     while (okayToKeepTrying(puzzle)) {
         const unfilledCells : SudokuCell[] = getUnfilledCells(puzzle);
-        for (const cell of unfilledCells) {
+        for (let unfilledCellIndex = 0; unfilledCellIndex < unfilledCells.length; unfilledCellIndex++) {
+            const cell = unfilledCells[unfilledCellIndex];
             checkCell(puzzle, cell.index);
         }
     }
@@ -612,6 +638,10 @@ function verifySolution(puzzle : SudokuPuzzle) {
         const cellsInBox = getCellsInBox(puzzle, cell.box, SudokuFilterCondition.ALL_CELLS, cell.index);
         const cellsInColumn = getCellsInColumn(puzzle, cell.column, SudokuFilterCondition.ALL_CELLS, cell.index);
         const cellsInRow = getCellsInRow(puzzle, cell.row, SudokuFilterCondition.ALL_CELLS, cell.index);
+        if (!cell.hasOwnProperty('value') || cell.value === 0) {
+            valid = false;
+            throw new Error(`Error found! Cell ${cell.index} (row ${cell.row + 1}, column ${cell.column + 1}) has no value.`);
+        }
         if (cellsInBox.filter((c) : boolean => { return !c.hasOwnProperty('value') || c.value === cell.value} ).length) {
             valid = false;
             throw new Error(`Conflict found! Cell ${cell.index} (row ${cell.row + 1}, column ${cell.column + 1}) `
@@ -635,16 +665,27 @@ function verifySolution(puzzle : SudokuPuzzle) {
 
 
 initializeColors(true);
+// let puzzleValues = [
+//     [5,3,0,0,7,0,0,0,0],
+//     [6,0,0,1,9,5,0,0,0],
+//     [0,9,8,0,0,0,0,6,0],
+//     [8,0,0,0,6,0,0,0,3],
+//     [4,0,0,8,0,3,0,0,1],
+//     [7,0,0,0,2,0,0,0,6],
+//     [0,6,0,0,0,0,2,8,0],
+//     [0,0,0,4,1,9,0,0,5],
+//     [0,0,0,0,8,0,0,7,9]];
 let puzzleValues = [
-    [5,3,0,0,7,0,0,0,0],
-    [6,0,0,1,9,5,0,0,0],
-    [0,9,8,0,0,0,0,6,0],
-    [8,0,0,0,6,0,0,0,3],
-    [4,0,0,8,0,3,0,0,1],
-    [7,0,0,0,2,0,0,0,6],
-    [0,6,0,0,0,0,2,8,0],
-    [0,0,0,4,1,9,0,0,5],
-    [0,0,0,0,8,0,0,7,9]];
+    [0,4,9,0,0,6,0,3,1],
+    [0,0,0,0,0,0,4,0,0],
+    [0,2,0,8,0,0,0,0,0],
+    [0,0,0,0,0,5,7,0,0],
+    [0,0,4,0,0,0,6,0,0],
+    [0,9,0,0,2,0,0,4,5],
+    [0,0,0,0,0,0,0,0,7],
+    [0,0,3,0,0,1,0,5,9],
+    [1,0,0,0,6,0,0,0,0]
+];
 
 const puzzle = initializePuzzleFromArray(puzzleValues);
 /*
